@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Code Generation Progress</title>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    #progress { margin-top: 20px; }
+    .file-status { margin-bottom: 5px; }
+    .completed { color: green; }
+    .processing { color: orange; }
+  </style>
+</head>
+<body>
+  <h1>QR Code Generation Progress</h1>
+  <div id="progress">
+    <!-- 進行状況がここに表示されます -->
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    // QRコード生成の進行状況を受け取る
+    ipcRenderer.on('qr-generation-progress', (event, message) => {
+      const progressDiv = document.getElementById('progress');
+      
+      // ファイルの進行状況を表示
+      const fileStatus = document.createElement('div');
+      fileStatus.classList.add('file-status');
+      if (message.status === 'processing') {
+        fileStatus.classList.add('processing');
+        fileStatus.textContent = `Processing: ${message.file}`;
+      } else if (message.status === 'completed') {
+        fileStatus.classList.add('completed');
+        fileStatus.textContent = `Completed: ${message.file}`;
+      }
+      progressDiv.appendChild(fileStatus);
+    });
+  </script>
+</body>
+</html>

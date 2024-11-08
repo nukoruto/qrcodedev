@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs-extra');
 const path = require('path');
 const QRCode = require('qrcode');
+const electron = require('electron');
 
 const os = require('os');
 const hostname = os.hostname();
@@ -44,7 +45,7 @@ async function createQRCodeForFiles(mainWindow) {
       if (file.endsWith('.xlsx')) {  // Excelファイルのみに限定
         const filePath = path.join(srcPath, file);
         const qrFilePath = path.join(destPath, `${path.parse(file).name}.png`);
-        const qrData = `file://${filePath}`;
+        const qrData = `${filePath}`;
 
         // 変換開始を通知
         mainWindow.webContents.send('qr-generation-progress', { file, status: 'processing' });

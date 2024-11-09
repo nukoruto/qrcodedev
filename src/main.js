@@ -10,8 +10,8 @@ const username = os.userInfo().username;
 
 // ディレクトリパスの設定
 const baseDirectory = `\\\\${hostname}\\Users\\${username}\\Desktop\\data`;
-const tenkenPath = path.join(baseDirectory, 'tenken');
-const manualPath = path.join(baseDirectory, 'manual');
+const tenkenPath = path.join(baseDirectory, 'tenken', 'data');
+const manualPath = path.join(baseDirectory, 'manual', 'data');
 const qrTenkenPath = path.join(baseDirectory, 'qrcode', 'tenken');
 const qrManualPath = path.join(baseDirectory, 'qrcode', 'manual');
 

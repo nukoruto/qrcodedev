@@ -1,19 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="jp">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QR Code Generation Progress</title>
+  <title>QRコード生成進捗</title>
   <style>
     body { font-family: Arial, sans-serif; }
     #progress { margin-top: 20px; }
     .file-status { margin-bottom: 5px; }
     .completed { color: green; }
     .processing { color: orange; }
+    .error { color: red; }
+    progress {
+      width: 100%;
+      height: 20px;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
-  <h1>QR Code Generation Progress</h1>
+  <h1>QRコード生成進捗</h1>
+  <progress id="progress-bar" value="0" max="100"></progress>
   <div id="progress">
     <!-- 進行状況がここに表示されます -->
   </div>
@@ -21,20 +28,36 @@
   <script>
     const { ipcRenderer } = require('electron');
 
+    const progressBar = document.getElementById('progress-bar');
+    let totalFiles = 0;
+    let processedFiles = 0;
+
+    // QRコード生成の総フォルダ数を受け取る
+    ipcRenderer.on('qr-total-files', (event, total) => {
+      totalFiles = total;
+    });
+
     // QRコード生成の進行状況を受け取る
     ipcRenderer.on('qr-generation-progress', (event, message) => {
       const progressDiv = document.getElementById('progress');
       
-      // ファイルの進行状況を表示
+      // フォルダの進行状況を表示
       const fileStatus = document.createElement('div');
       fileStatus.classList.add('file-status');
+      
       if (message.status === 'processing') {
         fileStatus.classList.add('processing');
-        fileStatus.textContent = `Processing: ${message.file}`;
+        fileStatus.textContent = `処理中: ${message.file}`;
       } else if (message.status === 'completed') {
         fileStatus.classList.add('completed');
-        fileStatus.textContent = `Completed: ${message.file}`;
+        fileStatus.textContent = `完了: ${message.file}`;
+        processedFiles++;
+        progressBar.value = (processedFiles / totalFiles) * 100;
+      } else if (message.status === 'error') {
+        fileStatus.classList.add('error');
+        fileStatus.textContent = `エラー: ${message.file}`;
       }
+
       progressDiv.appendChild(fileStatus);
     });
   </script>

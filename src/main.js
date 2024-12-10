@@ -1,7 +1,9 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow } = require('electron');
 const fs = require('fs-extra');
 const path = require('path');
 const QRCode = require('qrcode');
+const sharp = require('sharp');
+const { ipcMain } = require('electron');
 const electron = require('electron');
 
 const os = require('os');
@@ -9,11 +11,8 @@ const hostname = os.hostname();
 const username = os.userInfo().username;
 
 // ディレクトリパスの設定
-const baseDirectory = `\\\\${hostname}\\Users\\${username}\\Desktop\\data`;
-const tenkenPath = path.join(baseDirectory, 'tenken', 'data');
-const manualPath = path.join(baseDirectory, 'manual', 'data');
-const qrTenkenPath = path.join(baseDirectory, 'qrcode', 'tenken');
-const qrManualPath = path.join(baseDirectory, 'qrcode', 'manual');
+const baseDirectory = `\\\\${hostname}\\Users\\${username}\\Desktop\\data\\data`;
+const qrcodePath = path.join(baseDirectory, '..', 'qrcode');
 
 // メインウィンドウの作成
 function createWindow() {
@@ -22,8 +21,8 @@ function createWindow() {
     height: 600,
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false
-    }
+      contextIsolation: false,
+    },
   });
   mainWindow.loadFile('index.html');
   return mainWindow;
@@ -31,44 +30,98 @@ function createWindow() {
 
 // ディレクトリの作成（存在しない場合）
 async function ensureDirectories() {
-  await fs.ensureDir(tenkenPath);
-  await fs.ensureDir(manualPath);
-  await fs.ensureDir(qrTenkenPath);
-  await fs.ensureDir(qrManualPath);
+  await fs.ensureDir(baseDirectory);
+  await fs.ensureDir(qrcodePath);
 }
 
-// QRコードの生成と進行状況の送信
-async function createQRCodeForFiles(mainWindow) {
-  const createQRCode = async (srcPath, destPath) => {
-    const files = await fs.readdir(srcPath);
-    for (const file of files) {
-      if (file.endsWith('.xlsx')) {  // Excelファイルのみに限定
-        const filePath = path.join(srcPath, file);
-        const qrFilePath = path.join(destPath, `${path.parse(file).name}.png`);
-        const qrData = `${filePath}`;
+// QRコード生成とフォルダ名の追加
+async function createQRCodeForFolders() {
+  try {
+    const folders = await fs.readdir(baseDirectory, { withFileTypes: true });
+    const totalFolders = folders.filter(folder => folder.isDirectory() && folder.name !== 'qrcode').length;
 
-        // 変換開始を通知
-        mainWindow.webContents.send('qr-generation-progress', { file, status: 'processing' });
+    // 合計フォルダ数を送信
+    const mainWindow = BrowserWindow.getAllWindows()[0];
+    mainWindow.webContents.send('qr-total-files', totalFolders);
 
-        // QRコードの生成と保存
-        await QRCode.toFile(qrFilePath, qrData, { type: 'png' });
-        
-        // 変換完了を通知
-        mainWindow.webContents.send('qr-generation-progress', { file, status: 'completed' });
+    // TTFフォントのパスとBase64エンコード
+    const fontPath = path.join(__dirname, 'NotoSansJP-VariableFont_wght.ttf');
+    const fontBase64 = fs.readFileSync(fontPath).toString('base64');
+
+    let processedFolders = 0;
+
+    for (const folder of folders) {
+      if (folder.isDirectory() && folder.name !== 'qrcode') {
+        const folderPath = path.join(baseDirectory, folder.name);
+        const qrFilePath = path.join(qrcodePath, `${folder.name}.png`);
+        const qrData = `Folder: ${folderPath}`;
+
+        // 処理開始メッセージを送信
+        mainWindow.webContents.send('qr-generation-progress', { file: folder.name, status: 'processing' });
+
+        try {
+          // QRコードをバッファに生成
+          const qrBuffer = await QRCode.toBuffer(qrData, { type: 'png', width: 400 });
+
+          // テキスト部分のSVGを作成
+          const textSvg = `
+            <svg width="400" height="50" xmlns="http://www.w3.org/2000/svg">
+              <style>
+                @font-face {
+                  font-family: "CustomFont";
+                  src: url("data:font/ttf;base64,${fontBase64}") format("truetype");
+                }
+                .custom-text {
+                  font-family: "CustomFont";
+                  font-size: 20px;
+                  fill: black;
+                }
+              </style>
+              <text x="200" y="35" text-anchor="middle" class="custom-text">${folder.name}</text>
+            </svg>
+          `;
+
+          // テキスト部分のSVGをバッファに変換
+          const textBuffer = Buffer.from(textSvg);
+
+          // QRコードとテキストを結合
+          await sharp({
+            create: {
+              width: 400,
+              height: 450, // QRコード(400) + テキスト部分(50)
+              channels: 4,
+              background: { r: 255, g: 255, b: 255, alpha: 1 },
+            },
+          })
+            .composite([
+              { input: qrBuffer, top: 0, left: 0 },
+              { input: textBuffer, top: 400, left: 0 },
+            ])
+            .toFile(qrFilePath);
+
+          // 処理完了メッセージを送信
+          mainWindow.webContents.send('qr-generation-progress', { file: folder.name, status: 'completed' });
+          processedFolders++;
+        } catch (err) {
+          // エラーメッセージを送信
+          mainWindow.webContents.send('qr-generation-progress', { file: folder.name, status: 'error' });
+        }
       }
     }
-  };
-
-  // tenkenフォルダとmanualフォルダのファイルに対して処理
-  await createQRCode(tenkenPath, qrTenkenPath);
-  await createQRCode(manualPath, qrManualPath);
+  } catch (error) {
+    console.error('Error generating QR codes:', error);
+  }
 }
 
 // アプリの初期化処理
 app.whenReady().then(async () => {
-  const mainWindow = createWindow();
-  await ensureDirectories();
-  await createQRCodeForFiles(mainWindow);
+  try {
+    const mainWindow = createWindow();
+    await ensureDirectories();
+    await createQRCodeForFolders();
+  } catch (error) {
+    console.error('Initialization error:', error);
+  }
 });
 
 // アプリ終了時の処理

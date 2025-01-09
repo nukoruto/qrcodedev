@@ -55,7 +55,7 @@ async function createQRCodeForFolders() {
         const folderPath = path.join(baseDirectory, folder.name);
         const qrFilePath = path.join(qrcodePath, `${folder.name}.png`);
     
-        // 親ディレクトリを除外し、data/folder.name のみを取得
+        // 親ディレクトリを除外し、folder.name のみを取得
         const qrData = path.relative(baseDirectory, folderPath).replace(/\\/g, '/');
     
         // 処理開始メッセージを送信

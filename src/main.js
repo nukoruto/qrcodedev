@@ -54,16 +54,15 @@ async function createQRCodeForFolders() {
       if (folder.isDirectory() && folder.name !== 'qrcode') {
         const folderPath = path.join(baseDirectory, folder.name);
         const qrFilePath = path.join(qrcodePath, `${folder.name}.png`);
-        const qrData = `${folderPath}`;
-
+    
+        // 親ディレクトリを除外し、data/folder.name のみを取得
+        const qrData = path.relative(baseDirectory, folderPath).replace(/\\/g, '/');
+    
         // 処理開始メッセージを送信
         mainWindow.webContents.send('qr-generation-progress', { file: folder.name, status: 'processing' });
-
+    
         try {
-          // QRコードをバッファに生成
           const qrBuffer = await QRCode.toBuffer(qrData, { type: 'png', width: 400 });
-
-          // テキスト部分のSVGを作成
           const textSvg = `
             <svg width="400" height="50" xmlns="http://www.w3.org/2000/svg">
               <style>
@@ -80,15 +79,12 @@ async function createQRCodeForFolders() {
               <text x="200" y="35" text-anchor="middle" class="custom-text">${folder.name}</text>
             </svg>
           `;
-
-          // テキスト部分のSVGをバッファに変換
           const textBuffer = Buffer.from(textSvg);
-
-          // QRコードとテキストを結合
+    
           await sharp({
             create: {
               width: 400,
-              height: 450, // QRコード(400) + テキスト部分(50)
+              height: 450,
               channels: 4,
               background: { r: 255, g: 255, b: 255, alpha: 1 },
             },
@@ -98,20 +94,20 @@ async function createQRCodeForFolders() {
               { input: textBuffer, top: 400, left: 0 },
             ])
             .toFile(qrFilePath);
-
-          // 処理完了メッセージを送信
+    
           mainWindow.webContents.send('qr-generation-progress', { file: folder.name, status: 'completed' });
           processedFolders++;
         } catch (err) {
-          // エラーメッセージを送信
           mainWindow.webContents.send('qr-generation-progress', { file: folder.name, status: 'error' });
         }
       }
     }
+    
   } catch (error) {
     console.error('Error generating QR codes:', error);
   }
 }
+
 
 // アプリの初期化処理
 app.whenReady().then(async () => {

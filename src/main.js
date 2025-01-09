@@ -54,7 +54,7 @@ async function createQRCodeForFolders() {
       if (folder.isDirectory() && folder.name !== 'qrcode') {
         const folderPath = path.join(baseDirectory, folder.name);
         const qrFilePath = path.join(qrcodePath, `${folder.name}.png`);
-        const qrData = `Folder: ${folderPath}`;
+        const qrData = `${folderPath}`;
 
         // 処理開始メッセージを送信
         mainWindow.webContents.send('qr-generation-progress', { file: folder.name, status: 'processing' });
